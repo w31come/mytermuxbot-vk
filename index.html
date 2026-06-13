@@ -1,288 +1,165 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Token</title>
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 16px; background: #f5f5f5; }
+        .box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
+        button { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-blue { background: #0077ff; color: white; }
+        .btn-purple { background: #7356bf; color: white; margin-top: 10px; }
+        .token { background: #f0f2f5; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; word-break: break-all; margin: 10px 0; }
+        .hidden { display: none; }
+        .status { padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+        .ok { background: #e8f5e9; color: #2e7d32; }
+        .err { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        input { width: 100%; padding: 10px; border: 1px solid #d3d9de; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+        label { font-size: 14px; display: block; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
 
-import requests
-import json
-import os
-import sys
-import time
-
-# ========== КОНФИГУРАЦИЯ ==========
-# Заполни после первого запуска Mini App в авто-режиме
-GIST_ID = ""           # Вставь сюда Gist ID
-GITHUB_TOKEN = ""      # Вставь сюда GitHub Token
-
-# Файлы
-CONFIG_FILE = os.path.expanduser("~/.vk_bot_config.json")
-TOKEN_FILE = os.path.expanduser("~/.vk_token")
-GIST_CONFIG = os.path.expanduser("~/.vk_gist_config")
-
-# ========== ЗАГРУЗКА КОНФИГА ==========
-
-def load_gist_config():
-    """Загружает Gist ID и GitHub Token из файла"""
-    global GIST_ID, GITHUB_TOKEN
+<div class="box">
+    <h2>🔑 VK Token Auto</h2>
+    <div id="status" class="status hidden"></div>
     
-    if os.path.exists(GIST_CONFIG):
-        try:
-            with open(GIST_CONFIG, 'r') as f:
-                data = json.load(f)
-                GIST_ID = data.get('gist_id', GIST_ID)
-                GITHUB_TOKEN = data.get('github_token', GITHUB_TOKEN)
-        except:
-            pass
-
-def save_gist_config():
-    """Сохраняет Gist конфиг"""
-    try:
-        with open(GIST_CONFIG, 'w') as f:
-            json.dump({
-                'gist_id': GIST_ID,
-                'github_token': GITHUB_TOKEN
-            }, f)
-        os.chmod(GIST_CONFIG, 0o600)
-    except Exception as e:
-        print(f"[-] Ошибка сохранения конфига: {e}")
-
-# Загружаем конфиг при старте
-load_gist_config()
-
-# ========== ПОЛУЧЕНИЕ ТОКЕНА ==========
-
-def get_token_from_gist():
-    """Забирает токен из GitHub Gist"""
-    if not GIST_ID or not GITHUB_TOKEN:
-        return None
+    <label>GitHub Token:</label>
+    <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
     
-    try:
-        response = requests.get(
-            f"https://api.github.com/gists/{GIST_ID}",
-            headers={
-                "Authorization": f"token {GITHUB_TOKEN}",
-                "Accept": "application/vnd.github.v3+json"
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        for filename, fileinfo in data.get('files', {}).items():
-            if filename == 'vk_token.json':
-                token_data = json.loads(fileinfo['content'])
-                token = token_data.get('access_token')
-                
-                # Проверяем, не протух ли
-                if token:
-                    return token
-        
-        return None
-        
-    except Exception as e:
-        print(f"[-] Ошибка Gist: {e}")
-        return None
-
-
-def get_token_from_file():
-    """Загружает токен из локального файла"""
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f:
-                data = json.load(f)
-                return data.get('token')
-        
-        if os.path.exists(TOKEN_FILE):
-            with open(TOKEN_FILE, 'r') as f:
-                return f.read().strip()
-                
-    except Exception as e:
-        print(f"[-] Ошибка чтения файла: {e}")
+    <label>Gist ID (оставь пустым):</label>
+    <input type="text" id="gistId" placeholder="необязательно">
     
-    return None
-
-
-def save_token_local(token):
-    """Сохраняет токен локально"""
-    try:
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump({'token': token}, f)
-        os.chmod(CONFIG_FILE, 0o600)
-        return True
-    except Exception as e:
-        print(f"[-] Ошибка сохранения: {e}")
-        return False
-
-
-def get_token(force_refresh=False):
-    """
-    Получает токен автоматически:
-    1. Локальный кэш
-    2. GitHub Gist (если настроен)
-    3. None (нужно запустить Mini App)
-    """
-    if not force_refresh:
-        # Пробуем локальный
-        token = get_token_from_file()
-        if token:
-            return token
+    <button class="btn-blue" onclick="autoGetToken()">🚀 Получить и сохранить</button>
     
-    # Пробуем Gist
-    if GIST_ID and GITHUB_TOKEN:
-        token = get_token_from_gist()
-        if token:
-            save_token_local(token)
-            return token
+    <div id="result" class="hidden">
+        <p><b>Токен:</b></p>
+        <div class="token" id="token"></div>
+    </div>
     
-    return None
+    <p style="font-size: 13px; color: #818c99; margin-top: 10px;" id="hint">Нажми кнопку для автоматического получения</p>
+</div>
 
+<script>
+const APP_ID = 54634841;
+let bridge = null;
+let vkToken = null;
 
-# ========== VK API ==========
+function showStatus(text, type) {
+    const el = document.getElementById('status');
+    el.textContent = text;
+    el.className = 'status ' + type;
+    el.classList.remove('hidden');
+}
 
-def vk_api(method, **params):
-    """Универсальный вызов VK API с авто-обновлением токена"""
-    token = get_token()
-    
-    if not token:
-        raise Exception(
-            "❌ Токен не найден!\n"
-            "1. Открой Mini App в VK\n"
-            "2. Введи GitHub Token\n"
-            "3. Нажми 'Запустить авто-режим'\n"
-            "4. Скопируй Gist ID в этот скрипт"
-        )
-    
-    params.update({
-        'access_token': token,
-        'v': '5.199'
-    })
-    
-    try:
-        response = requests.post(
-            f'https://api.vk.com/method/{method}',
-            data=params,
-            timeout=30
-        )
-        response.raise_for_status()
-        result = response.json()
-        
-        # Проверяем ошибку токена
-        if 'error' in result:
-            error_code = result['error'].get('error_code')
-            
-            if error_code == 5:  # Authorization failed
-                print("[-] Токен протух, обновляем из Gist...")
-                # Чистим кэш и пробуем снова
-                for f in [CONFIG_FILE, TOKEN_FILE]:
-                    if os.path.exists(f):
-                        os.remove(f)
-                
-                # Пробуем забрать свежий из Gist
-                token = get_token(force_refresh=True)
-                if token:
-                    return vk_api(method, **params)
-                else:
-                    raise Exception("Токен недействителен. Запусти Mini App снова.")
-            
-            raise Exception(
-                f"VK API Error {error_code}: {result['error'].get('error_msg')}"
-            )
-        
-        return result
-        
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"Сетевая ошибка: {e}")
-
-
-# ========== УДОБНЫЕ МЕТОДЫ ==========
-
-def post_to_wall(message, attachments=None, owner_id=None):
-    """Пост на стену"""
-    params = {'message': message}
-    if attachments:
-        params['attachments'] = attachments
-    if owner_id:
-        params['owner_id'] = owner_id
-    return vk_api('wall.post', **params)
-
-
-def get_user_info(user_ids=None):
-    """Информация о пользователе"""
-    params = {}
-    if user_ids:
-        params['user_ids'] = user_ids
-    return vk_api('users.get', **params)
-
-
-def get_friends(count=100):
-    """Список друзей"""
-    return vk_api('friends.get', count=count, fields='first_name,last_name')
-
-
-def send_message(peer_id, message, attachment=None):
-    """Отправка сообщения"""
-    params = {
-        'peer_id': peer_id,
-        'message': message,
-        'random_id': int(time.time() * 1000)
+// Инициализация
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        bridge = vkBridge.default || vkBridge;
+        await bridge.send('VKWebAppInit');
+        showStatus('✅ Готово', 'ok');
+    } catch (e) {
+        showStatus('❌ Ошибка инициализации: ' + e.message, 'err');
     }
-    if attachment:
-        params['attachment'] = attachment
-    return vk_api('messages.send', **params)
+});
 
-
-# ========== АВТО-НАСТРОЙКА ==========
-
-def setup_from_gist(gist_id, github_token):
-    """Настройка Gist ID и GitHub Token"""
-    global GIST_ID, GITHUB_TOKEN
+async function autoGetToken() {
+    const btn = document.querySelector('button');
+    btn.disabled = true;
+    btn.textContent = 'Загрузка...';
     
-    GIST_ID = gist_id
-    GITHUB_TOKEN = github_token
-    save_gist_config()
-    
-    # Сразу пробуем получить токен
-    token = get_token_from_gist()
-    if token:
-        save_token_local(token)
-        print(f"[+] Токен получен: {token[:20]}...")
-        return True
-    return False
+    try {
+        // 1. Получаем VK токен
+        showStatus('Получаем VK токен...', 'info');
+        const vkResult = await bridge.send('VKWebAppGetAuthToken', {
+            app_id: APP_ID,
+            scope: 'wall,friends,photos,groups,video,docs,status'
+        });
+        
+        if (!vkResult.access_token) {
+            throw new Error('Токен не получен');
+        }
+        
+        vkToken = vkResult.access_token;
+        document.getElementById('token').textContent = vkToken;
+        document.getElementById('result').classList.remove('hidden');
+        
+        // 2. Сохраняем в Gist
+        const githubToken = document.getElementById('githubToken').value.trim();
+        const gistId = document.getElementById('gistId').value.trim();
+        
+        if (githubToken) {
+            showStatus('Сохраняем в Gist...', 'info');
+            await saveToGist(githubToken, gistId, vkToken);
+            showStatus('✅ Готово! Токен сохранён в Gist', 'ok');
+        } else {
+            showStatus('✅ Токен получен! Введи GitHub Token для автосохранения', 'ok');
+        }
+        
+    } catch (e) {
+        console.error(e);
+        showStatus('❌ ' + (e.error_data?.error_reason || e.message), 'err');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Получить и сохранить';
+    }
+}
 
-
-# ========== ТЕСТИРОВАНИЕ ==========
-
-if __name__ == "__main__":
-    print("=" * 50)
-    print("🤖 VK Bot Auto для Termux")
-    print("=" * 50)
+async function saveToGist(githubToken, gistId, token) {
+    const content = JSON.stringify({
+        access_token: token,
+        created_at: new Date().toISOString(),
+        app_id: APP_ID
+    }, null, 2);
     
-    # Проверяем конфиг
-    if not GIST_ID or not GITHUB_TOKEN:
-        print("\n[-] Не настроен Gist!")
-        print("[i] Варианты:")
-        print("   1. Запусти Mini App в VK и используй авто-режим")
-        print("   2. Или введи вручную:")
-        
-        gist_id = input("   Gist ID: ").strip()
-        token = input("   GitHub Token: ").strip()
-        
-        if setup_from_gist(gist_id, token):
-            print("[+] Настройка завершена!")
-        else:
-            print("[-] Не удалось получить токен")
-            sys.exit(1)
+    let response;
     
-    # Проверяем токен
-    print("\n[+] Проверяем токен...")
-    try:
-        user = get_user_info()
-        name = user['response'][0]
-        print(f"[+] Привет, {name['first_name']} {name['last_name']}! ✅")
-        
-        # Тест: пост на стену (раскомментируй)
-        # result = post_to_wall("🤖 Автопост из Termux!")
-        # print(f"[+] Пост создан: {result}")
-        
-    except Exception as e:
-        print(f"[-] Ошибка: {e}")
-        sys.exit(1)
+    if (gistId) {
+        response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                files: {
+                    'vk_token.json': { content: content }
+                }
+            })
+        });
+    } else {
+        response = await fetch('https://api.github.com/gists', {
+            method: 'POST',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: 'VK Token',
+                public: false,
+                files: {
+                    'vk_token.json': { content: content }
+                }
+            })
+        });
+    }
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(result.message);
+    }
+    
+    if (!gistId) {
+        document.getElementById('gistId').value = result.id;
+    }
+    
+    return result.id;
+}
+</script>
+
+</body>
+</html>
