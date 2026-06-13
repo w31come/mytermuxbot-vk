@@ -1,0 +1,29 @@
+name: Get VK Token
+
+on:
+  workflow_dispatch:  # Только ручной запуск (безопасность)
+
+jobs:
+  token:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install chromium
+      
+      - name: Get VK token
+        env:
+          VK_LOGIN: ${{ secrets.VK_LOGIN }}
+          VK_PASS: ${{ secrets.VK_PASS }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+        run: python get_token.py
