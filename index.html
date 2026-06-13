@@ -2,20 +2,71 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VK Token</title>
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
-        .box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; }
-        button { width: 100%; padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            padding: 16px; 
+            background: #f5f5f5; 
+            line-height: 1.5;
+        }
+        .box { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-bottom: 16px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 { font-size: 18px; margin-bottom: 12px; }
+        h3 { font-size: 16px; margin-bottom: 10px; }
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            font-size: 16px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer;
+            font-weight: 500;
+        }
         .btn-blue { background: #0077ff; color: white; }
+        .btn-blue:disabled { background: #99caff; }
         .btn-green { background: #4bb34b; color: white; margin-top: 10px; }
-        .token { background: #f0f2f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; word-break: break-all; margin: 10px 0; }
+        .btn-red { background: #e64646; color: white; margin-top: 10px; }
+        .token { 
+            background: #f0f2f5; 
+            padding: 12px; 
+            border-radius: 8px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+            word-break: break-all; 
+            margin: 10px 0;
+            border: 1px solid #e1e3e6;
+        }
         .hidden { display: none; }
-        .status { padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 14px; }
+        .status { 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-bottom: 12px; 
+            font-size: 14px; 
+        }
         .ok { background: #e8f5e9; color: #2e7d32; }
         .err { background: #ffebee; color: #c62828; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        .debug { 
+            background: #fff3e0; 
+            color: #e65100; 
+            font-family: monospace; 
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .hint { 
+            font-size: 13px; 
+            color: #818c99; 
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -23,6 +74,8 @@
 <div class="box">
     <h2>🔑 Получение токена VK</h2>
     <div id="status" class="status hidden"></div>
+    <div id="debug" class="status debug hidden"></div>
+    
     <button id="btn" class="btn-blue" onclick="getToken()">Получить токен</button>
     
     <div id="result" class="hidden">
@@ -30,59 +83,154 @@
         <div class="token" id="token"></div>
         <button class="btn-green" onclick="copyToken()">📋 Скопировать</button>
     </div>
+    
+    <p class="hint" id="hint">Нажмите кнопку для запроса токена</p>
+</div>
+
+<div class="box" id="infoBox">
+    <h3>📊 Диагностика</h3>
+    <div id="diagnostic"></div>
 </div>
 
 <div class="box">
     <h3>📖 Для Python-скрипта:</h3>
     <div class="token">
-TOKEN = "<span style="color:#0077ff">скопируйте_токен_выше</span>"<br><br>
+TOKEN = "<span style="color:#0077ff">скопируйте_токен_выше</span>"<<br><br>
 import requests<br>
 r = requests.get("https://api.vk.com/method/users.get", <br>
-&nbsp;&nbsp;params={"access_token": TOKEN, "v": "5.199"})<br>
+&nbsp;&nbsp;params={"access_token": TOKEN, "v": "5.199"})<<br>
 print(r.json())
     </div>
 </div>
 
 <script>
-const bridge = vkBridge;
-const APP_ID = 0; // 0 = автоопределение текущего Mini App
+// ============ ДИАГНОСТИКА ============
+
+function log(msg) {
+    console.log('[VK Token]', msg);
+    const debug = document.getElementById('debug');
+    debug.textContent += msg + '\n';
+    debug.classList.remove('hidden');
+}
+
+function showStatus(text, type) {
+    const el = document.getElementById('status');
+    el.textContent = text;
+    el.className = 'status ' + type;
+    el.classList.remove('hidden');
+}
+
+function showHint(text) {
+    document.getElementById('hint').textContent = text;
+}
+
+// Проверяем окружение
+const isVK = window.location.href.includes('vk.com') || 
+             window.location.href.includes('vk-apps.com') ||
+             document.referrer.includes('vk.com');
+
+const isWebView = /(iPhone|iPod|iPad).*AppleWebKit.*(iPhone|iPod|iPad)/i.test(navigator.userAgent) ||
+                  /Android.*Version\/[0-9.]*.*Chrome\/[0-9.]* Mobile/i.test(navigator.userAgent);
+
+document.getElementById('diagnostic').innerHTML = `
+    <div class="token" style="font-size:11px;">
+vkBridge доступен: ${typeof vkBridge !== 'undefined' ? '✅ Да' : '❌ Нет'}<<br>
+vkBridge.default: ${typeof vkBridge !== 'undefined' && vkBridge.default ? '✅ Да' : '❌ Нет'}<<br>
+URL: ${window.location.href}<br>
+Referrer: ${document.referrer || 'нет'}<<br>
+User-Agent: ${navigator.userAgent.substring(0, 50)}...<<br>
+VK окружение: ${isVK ? '✅ Да' : '❌ Нет (откройте через VK)'}<<br>
+WebView: ${isWebView ? '✅ Да' : '❌ Нет'}
+    </div>
+`;
+
+// ============ ЛОГИКА ============
 
 let token = null;
+let bridge = null;
+
+// Пытаемся получить bridge разными способами
+try {
+    if (typeof vkBridge !== 'undefined') {
+        bridge = vkBridge.default || vkBridge;
+        log('Bridge получен из глобального объекта');
+    }
+} catch (e) {
+    log('Ошибка получения bridge: ' + e.message);
+}
+
+async function init() {
+    if (!bridge) {
+        showStatus('❌ VK Bridge не найден. Откройте через VK.', 'err');
+        showHint('Это приложение работает только внутри VK');
+        return;
+    }
+    
+    try {
+        log('Инициализация VK Bridge...');
+        const result = await bridge.send('VKWebAppInit');
+        log('VKWebAppInit успешно: ' + JSON.stringify(result));
+        showStatus('✅ Приложение инициализировано', 'ok');
+        showHint('Нажмите кнопку для получения токена');
+    } catch (e) {
+        log('Ошибка VKWebAppInit: ' + (e.error_data?.error_reason || e.message));
+        showStatus('⚠️ Ошибка инициализации, но можно продолжить', 'info');
+    }
+}
 
 async function getToken() {
     const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
+    
+    if (!bridge) {
+        showStatus('❌ VK Bridge недоступен. Откройте это приложение через VK (мобильное приложение или vk.com)', 'err');
+        return;
+    }
     
     try {
         btn.disabled = true;
         btn.textContent = 'Загрузка...';
-        status.className = 'status';
-        status.textContent = 'Запрашиваем доступ...';
-        status.classList.remove('hidden');
+        showStatus('Запрашиваем токен...', 'info');
+        log('Отправка VKWebAppGetAuthToken...');
         
-        await bridge.send('VKWebAppInit');
+        // Пробуем сначала без app_id (0 = текущее приложение)
+        let result;
+        try {
+            result = await bridge.send('VKWebAppGetAuthToken', {
+                app_id: 0,
+                scope: ''
+            });
+            log('Токен получен (app_id: 0): ' + JSON.stringify(result).substring(0, 100));
+        } catch (e1) {
+            log('Не удалось с app_id=0, пробуем без параметров...');
+            // Пробуем минимальный вариант
+            result = await bridge.send('VKWebAppGetAuthToken');
+            log('Токен получен (без параметров): ' + JSON.stringify(result).substring(0, 100));
+        }
         
-        // Запрашиваем токен без явного scope (получим базовые права)
-        const result = await bridge.send('VKWebAppGetAuthToken', {
-            app_id: APP_ID,
-            scope: '' // Пустой scope = базовые права (users.get и т.д.)
-        });
-        
-        if (result.access_token) {
+        if (result && result.access_token) {
             token = result.access_token;
             document.getElementById('token').textContent = token;
             document.getElementById('result').classList.remove('hidden');
-            status.className = 'status ok';
-            status.textContent = '✅ Токен получен! Скопируйте его выше.';
+            showStatus('✅ Токен получен! Скопируйте его выше.', 'ok');
+            showHint('Токен действует бессрочно (до отзыва)');
             btn.textContent = '🔄 Обновить токен';
         } else {
-            throw new Error('Токен не получен');
+            throw new Error('Токен отсутствует в ответе');
         }
         
     } catch (e) {
-        console.error(e);
-        status.className = 'status err';
-        status.textContent = '❌ Ошибка: ' + (e.error_data?.error_reason || e.message || 'Неизвестная ошибка');
+        console.error('Ошибка:', e);
+        log('ОШИБКА: ' + JSON.stringify(e, null, 2));
+        
+        let errorMsg = 'Не удалось получить токен';
+        
+        if (e.error_data) {
+            errorMsg = e.error_data.error_reason || e.error_data.error_code || 'Неизвестная ошибка VK';
+        } else if (e.message) {
+            errorMsg = e.message;
+        }
+        
+        showStatus('❌ ' + errorMsg, 'err');
         btn.textContent = 'Повторить';
     } finally {
         btn.disabled = false;
@@ -91,23 +239,24 @@ async function getToken() {
 
 async function copyToken() {
     if (!token) return;
+    
     try {
         await bridge.send('VKWebAppCopyText', { text: token });
-        alert('Токен скопирован!');
+        showStatus('✅ Токен скопирован!', 'ok');
     } catch (e) {
-        // Fallback
+        // Fallback для копирования
         const el = document.createElement('textarea');
         el.value = token;
         document.body.appendChild(el);
         el.select();
         document.execCommand('copy');
         document.body.removeChild(el);
-        alert('Токен скопирован!');
+        showStatus('✅ Токен скопирован в буфер обмена!', 'ok');
     }
 }
 
-// Автозапуск при открытии
-bridge.send('VKWebAppInit').catch(() => {});
+// Автозапуск
+document.addEventListener('DOMContentLoaded', init);
 </script>
 
 </body>
