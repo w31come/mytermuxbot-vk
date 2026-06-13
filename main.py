@@ -17,7 +17,7 @@ def log(msg):
 
 def main():
     log('=' * 50)
-    log('VK Auto Poster v1.0 | App ID: 54634841')
+    log('VK Auto Poster v1.1 | App ID: 54634841')
     log('=' * 50)
     
     token = get_token_from_gist()
@@ -26,18 +26,14 @@ def main():
         sys.exit(1)
     
     if not validate_token(token):
-        log('[-] Токен невалиден')
+        log('[-] Токен невалиден или протух')
+        log('[i] Обнови токен через Mini App: https://vk.com/app54634841')
         sys.exit(1)
     
     vk = VKAPI(token)
     
-    me = vk.get_me()
-    if 'error' in me:
-        log(f'[-] Ошибка авторизации: {me["error"]}')
-        sys.exit(1)
-    
-    user = me['response'][0]
-    log(f'[+] Авторизован: {user["first_name"]} {user["last_name"]}')
+    # Не проверяем users.get — сразу постим
+    log('[+] Токен проверен, начинаем постинг...')
     log(f'[+] Групп для постинга: {len(GROUP_IDS)}')
     
     cycle = 0
@@ -62,7 +58,8 @@ def main():
                 code = result['error'].get('error_code')
                 
                 if code == 5:
-                    log('[-] Токен протух! Останавливаемся.')
+                    log('[-] Токен протух во время работы!')
+                    log('[i] Обнови токен через Mini App')
                     sys.exit(1)
                 elif code == 15:
                     log(f'[-] Нет прав для поста в {gid}')
