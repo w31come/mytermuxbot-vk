@@ -121,7 +121,7 @@
         <button class="btn-green" onclick="copyToken()">📋 Скопировать</button>
     </div>
     
-    <p class="hint" id="hint">Выберите нужные права и нажмите кнопку</p>
+    <p class="hint" id="hint">Выберите права и нажмите кнопку</p>
 </div>
 
 <div class="box" id="infoBox">
@@ -141,6 +141,9 @@ print(r.json())
 </div>
 
 <script>
+// === КОНФИГУРАЦИЯ ===
+const APP_ID = 54634841; // Твой реальный App ID
+
 function log(msg) {
     console.log('[VK Token]', msg);
     const debug = document.getElementById('debug');
@@ -168,6 +171,7 @@ const isWebView = /(iPhone|iPod|iPad).*AppleWebKit.*(iPhone|iPod|iPad)/i.test(na
 
 document.getElementById('diagnostic').innerHTML = `
     <div class="token" style="font-size:11px;">
+App ID: ${APP_ID}<br>
 vkBridge: ${typeof vkBridge !== 'undefined' ? '✅' : '❌'}<<br>
 URL: ${window.location.href}<br>
 Referrer: ${document.referrer || 'нет'}<<br>
@@ -232,10 +236,11 @@ async function getToken() {
         btn.disabled = true;
         btn.textContent = 'Загрузка...';
         showStatus('Запрашиваем токен...', 'info');
+        log('App ID: ' + APP_ID);
         log('Scope: ' + scope);
         
         const result = await bridge.send('VKWebAppGetAuthToken', {
-            app_id: 0,
+            app_id: APP_ID,
             scope: scope
         });
         
