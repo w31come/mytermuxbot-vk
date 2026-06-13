@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Token</title>
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .box { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; }
+        button { width: 100%; padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-blue { background: #0077ff; color: white; }
+        .btn-green { background: #4bb34b; color: white; margin-top: 10px; }
+        .token { background: #f0f2f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; word-break: break-all; margin: 10px 0; }
+        .hidden { display: none; }
+        .status { padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 14px; }
+        .ok { background: #e8f5e9; color: #2e7d32; }
+        .err { background: #ffebee; color: #c62828; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>🔑 Получение токена VK</h2>
+    <div id="status" class="status hidden"></div>
+    <button id="btn" class="btn-blue" onclick="getToken()">Получить токен</button>
+    
+    <div id="result" class="hidden">
+        <p><b>Ваш токен:</b></p>
+        <div class="token" id="token"></div>
+        <button class="btn-green" onclick="copyToken()">📋 Скопировать</button>
+    </div>
+</div>
+
+<div class="box">
+    <h3>📖 Для Python-скрипта:</h3>
+    <div class="token">
+TOKEN = "<span style="color:#0077ff">скопируйте_токен_выше</span>"<br><br>
+import requests<br>
+r = requests.get("https://api.vk.com/method/users.get", <br>
+&nbsp;&nbsp;params={"access_token": TOKEN, "v": "5.199"})<br>
+print(r.json())
+    </div>
+</div>
+
+<script>
+const bridge = vkBridge;
+const APP_ID = 0; // 0 = автоопределение текущего Mini App
+
+let token = null;
+
+async function getToken() {
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+    
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Загрузка...';
+        status.className = 'status';
+        status.textContent = 'Запрашиваем доступ...';
+        status.classList.remove('hidden');
+        
+        await bridge.send('VKWebAppInit');
+        
+        // Запрашиваем токен без явного scope (получим базовые права)
+        const result = await bridge.send('VKWebAppGetAuthToken', {
+            app_id: APP_ID,
+            scope: '' // Пустой scope = базовые права (users.get и т.д.)
+        });
+        
+        if (result.access_token) {
+            token = result.access_token;
+            document.getElementById('token').textContent = token;
+            document.getElementById('result').classList.remove('hidden');
+            status.className = 'status ok';
+            status.textContent = '✅ Токен получен! Скопируйте его выше.';
+            btn.textContent = '🔄 Обновить токен';
+        } else {
+            throw new Error('Токен не получен');
+        }
+        
+    } catch (e) {
+        console.error(e);
+        status.className = 'status err';
+        status.textContent = '❌ Ошибка: ' + (e.error_data?.error_reason || e.message || 'Неизвестная ошибка');
+        btn.textContent = 'Повторить';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function copyToken() {
+    if (!token) return;
+    try {
+        await bridge.send('VKWebAppCopyText', { text: token });
+        alert('Токен скопирован!');
+    } catch (e) {
+        // Fallback
+        const el = document.createElement('textarea');
+        el.value = token;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        alert('Токен скопирован!');
+    }
+}
+
+// Автозапуск при открытии
+bridge.send('VKWebAppInit').catch(() => {});
+</script>
+
+</body>
+</html>
