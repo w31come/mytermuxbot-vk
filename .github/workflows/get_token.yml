@@ -1,7 +1,7 @@
 name: Get VK Token
 
 on:
-  workflow_dispatch:  # Только ручной запуск (безопасность)
+  workflow_dispatch:
 
 jobs:
   token:
@@ -17,7 +17,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install playwright
+          pip install requests playwright
           playwright install chromium
       
       - name: Get VK token
