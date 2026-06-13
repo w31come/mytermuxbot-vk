@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Автоматическое получение VK токена через браузер (Playwright)
+Автоматическое получение VK токена через m.vk.com (Playwright)
 """
 
 import os
@@ -26,7 +26,7 @@ def save_to_gist(token, scope):
         'access_token': token,
         'scope': scope,
         'created_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'source': 'playwright_auto'
+        'source': 'm.vk.com'
     }, indent=2)
     
     try:
@@ -68,7 +68,7 @@ def get_vk_token():
     auth_url = (
         f'https://oauth.vk.com/authorize?'
         f'client_id={app_id}&'
-        f'display=page&'
+        f'display=mobile&'
         f'redirect_uri={redirect}&'
         f'scope={scope}&'
         f'response_type=token&'
@@ -80,132 +80,59 @@ def get_vk_token():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            viewport={'width': 1280, 'height': 720},
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0'
+            viewport={'width': 375, 'height': 812},  # Мобильный вид
+            user_agent='Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.0'
         )
         page = context.new_page()
         
         try:
-            # 1. Открываем страницу авторизации
-            log('[+] Открываем VK...')
-            page.goto('https://vk.com', wait_until='networkidle', timeout=30000)
+            # 1. Сначала логинимся на m.vk.com
+            log('[+] Открываем m.vk.com...')
+            page.goto('https://m.vk.com', wait_until='networkidle', timeout=30000)
+            page.screenshot(path='debug_1_mvk.png')
             
-            # Делаем скриншот для отладки
-            page.screenshot(path='debug_1_main.png')
+            # Ищем поле логина
+            log('[+] Вводим логин...')
+            page.fill('input[name="email"]', login, timeout=10000)
+            page.fill('input[name="pass"]', password, timeout=10000)
+            page.screenshot(path='debug_2_filled.png')
             
-            # 2. Ищем поле ввода (VK ID форма)
-            log('[+] Ищем форму входа...')
+            # Нажимаем войти
+            log('[+] Нажимаем "Войти"...')
+            page.click('input[type="submit"], button[type="submit"]', timeout=10000)
             
-            # Пробуем разные селекторы
-            selectors = [
-                'input[name="login"]',
-                'input[name="email"]',
-                'input[type="text"]',
-                'input[placeholder*="Телефон"]',
-                'input[placeholder*="Email"]',
-                'input[placeholder*="Login"]',
-                '.vkuiInput__el',
-                'input[class*="vkuiInput"]',
-                '[data-testid="login"]',
-            ]
+            # Ждём загрузки
+            page.wait_for_load_state('networkidle', timeout=30000)
+            time.sleep(2)
+            page.screenshot(path='debug_3_logged.png')
             
-            login_input = None
-            for sel in selectors:
-                try:
-                    login_input = page.locator(sel).first
-                    if login_input.is_visible(timeout=2000):
-                        log(f'[+] Найдено поле логина: {sel}')
-                        break
-                except:
-                    continue
+            log(f'[+] Текущий URL: {page.url}')
             
-            if not login_input:
-                log('[-] Поле логина не найдено, пробуем m.vk.com...')
-                # Пробуем мобильную версию
-                page.goto('https://m.vk.com', wait_until='networkidle', timeout=30000)
-                page.screenshot(path='debug_2_mobile.png')
-                
-                # На мобильной версии
-                try:
-                    page.fill('input[name="email"]', login, timeout=5000)
-                    page.fill('input[name="pass"]', password, timeout=5000)
-                    page.click('input[type="submit"], button[type="submit"]', timeout=5000)
-                except Exception as e:
-                    log(f'[-] Мобильная версия тоже не сработала: {e}')
-                    return None
-            else:
-                # Вводим логин
-                login_input.fill(login)
-                log('[+] Логин введён')
-                
-                # Ищем кнопку "Далее" или поле пароля
-                time.sleep(1)
-                page.screenshot(path='debug_3_after_login.png')
-                
-                # Пробуем нажать Enter или найти кнопку
-                try:
-                    page.keyboard.press('Enter')
-                    log('[+] Нажали Enter')
-                except:
-                    try:
-                        page.click('button[type="submit"]', timeout=3000)
-                    except:
-                        pass
-                
-                time.sleep(2)
-                page.screenshot(path='debug_4_after_enter.png')
-                
-                # Ищем поле пароля
-                pass_selectors = [
-                    'input[name="password"]',
-                    'input[type="password"]',
-                    'input[placeholder*="Пароль"]',
-                    'input[placeholder*="Password"]',
-                    '.vkuiInput__el[type="password"]',
-                ]
-                
-                pass_input = None
-                for sel in pass_selectors:
-                    try:
-                        pass_input = page.locator(sel).first
-                        if pass_input.is_visible(timeout=3000):
-                            log(f'[+] Найдено поле пароля: {sel}')
-                            break
-                    except:
-                        continue
-                
-                if pass_input:
-                    pass_input.fill(password)
-                    log('[+] Пароль введён')
-                    
-                    # Нажимаем войти
-                    try:
-                        page.keyboard.press('Enter')
-                    except:
-                        page.click('button[type="submit"]', timeout=3000)
-                    
-                    log('[+] Отправляем форму...')
+            # 2. Переходим на OAuth
+            log('[+] Переходим на страницу авторизации...')
+            page.goto(auth_url, wait_until='networkidle', timeout=30000)
+            time.sleep(2)
+            page.screenshot(path='debug_4_oauth.png')
             
-            # 3. Ждём редиректа
-            log('[+] Ждём авторизации...')
-            time.sleep(3)
-            page.screenshot(path='debug_5_after_auth.png')
+            log(f'[+] URL после OAuth: {page.url}')
             
-            # Если мы на oauth.vk.com/authorize — подтверждаем доступ
+            # 3. Если запрос на доступ — подтверждаем
             if 'authorize' in page.url:
-                log('[+] Запрос доступа, подтверждаем...')
+                log('[+] Подтверждаем доступ...')
                 try:
-                    page.click('button[type="submit"]', timeout=10000)
-                    log('[+] Доступ подтверждён')
+                    page.click('input[type="submit"], button[type="submit"]', timeout=10000)
+                    page.wait_for_load_state('networkidle', timeout=30000)
+                    time.sleep(2)
                 except:
                     log('[-] Кнопка подтверждения не найдена')
+            else:
+                log('[i] Запрос доступа не требуется')
             
-            # Ждём редиректа с токеном
-            page.wait_for_url(lambda url: 'access_token=' in url or 'blank.html' in url, timeout=30000)
+            page.screenshot(path='debug_5_after_auth.png')
             
-            # 4. Забираем токен
+            # 4. Забираем токен из URL
             url = page.url
-            log(f'[+] URL: {url[:100]}...')
+            log(f'[+] Финальный URL: {url[:150]}...')
             
             if 'access_token=' in url:
                 from urllib.parse import urlparse, parse_qs
@@ -214,32 +141,37 @@ def get_vk_token():
                 
                 token = params.get('access_token', [None])[0]
                 user_id = params.get('user_id', [None])[0]
+                expires = params.get('expires_in', ['0'])[0]
                 
                 if token:
                     log(f'[+] Токен получен: {token[:30]}...')
+                    log(f'[+] User ID: {user_id}')
+                    log(f'[+] Expires: {expires}')
+                    
                     if save_to_gist(token, scope):
                         return token
             
-            # Если токена нет в URL — проверяем localStorage или cookies
-            log('[-] Токен не найден в URL, пробуем другие способы...')
+            # Если токена нет — пробуем из HTML
+            log('[-] Токен не найден в URL, проверяем страницу...')
+            html = page.content()
+            if 'access_token' in html:
+                log('[i] Токен найден в HTML, парсим...')
+                # Простой парсинг
+                import re
+                match = re.search(r'access_token=([^&"\']+)', html)
+                if match:
+                    token = match.group(1)
+                    log(f'[+] Токен из HTML: {token[:30]}...')
+                    if save_to_gist(token, scope):
+                        return token
             
-            # Пробуем получить из localStorage
-            try:
-                token_data = page.evaluate('''() => {
-                    return localStorage.getItem('vk_access_token_settings') || 
-                           localStorage.getItem('access_token') || '';
-                }''')
-                if token_data:
-                    log(f'[+] Найден токен в localStorage')
-            except:
-                pass
-            
-            page.screenshot(path='debug_6_final.png')
+            log('[-] Токен не найден')
+            page.screenshot(path='error_final.png')
             return None
             
         except Exception as e:
             log(f'[-] Ошибка: {e}')
-            page.screenshot(path='error_final.png')
+            page.screenshot(path='error_exception.png')
             return None
             
         finally:
@@ -248,7 +180,7 @@ def get_vk_token():
 
 if __name__ == '__main__':
     log('=' * 50)
-    log('VK Token Auto-Grabber (Playwright)')
+    log('VK Token Auto-Grabber (m.vk.com)')
     log('=' * 50)
     
     token = get_vk_token()
