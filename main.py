@@ -43,9 +43,10 @@ def main():
     cycle = 0
     while True:
         cycle += 1
-        log(f"\n{'='*40}")
+        sep = '=' * 40
+        log(f'\n{sep}')
         log(f'🔄 Цикл #{cycle}  {datetime.now():%H:%M:%S}')
-        log(f'{'='*40}')
+        log(sep)
         
         posted = 0
         skipped = 0
@@ -84,9 +85,9 @@ def main():
                 log(f'⏳ Пауза {DELAY_BETWEEN_POSTS}с...')
                 time.sleep(DELAY_BETWEEN_POSTS)
         
-        log(f'{'='*40}')
+        log(sep)
         log(f'✅ Цикл #{cycle}: {posted} постов, {skipped} пропущено, {errors} ошибок')
-        log(f'{'='*40}')
+        log(sep)
         
         log(f'⏸️ ПЕРЕРЫВ {CYCLE_PAUSE // 60} МИНУТ')
         for left in range(CYCLE_PAUSE, 0, -60):
