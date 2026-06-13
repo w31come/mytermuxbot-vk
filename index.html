@@ -1,484 +1,288 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VK Token</title>
-    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            padding: 16px; 
-            background: #f5f5f5; 
-            line-height: 1.5;
-        }
-        .box { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 12px; 
-            margin-bottom: 16px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        h2 { font-size: 18px; margin-bottom: 12px; }
-        h3 { font-size: 16px; margin-bottom: 10px; }
-        button { 
-            width: 100%; 
-            padding: 14px; 
-            font-size: 16px; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer;
-            font-weight: 500;
-        }
-        .btn-blue { background: #0077ff; color: white; }
-        .btn-blue:disabled { background: #99caff; }
-        .btn-green { background: #4bb34b; color: white; margin-top: 10px; }
-        .btn-purple { background: #7356bf; color: white; margin-top: 10px; }
-        .token { 
-            background: #f0f2f5; 
-            padding: 12px; 
-            border-radius: 8px; 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            word-break: break-all; 
-            margin: 10px 0;
-            border: 1px solid #e1e3e6;
-        }
-        .hidden { display: none; }
-        .status { 
-            padding: 12px; 
-            border-radius: 8px; 
-            margin-bottom: 12px; 
-            font-size: 14px; 
-        }
-        .ok { background: #e8f5e9; color: #2e7d32; }
-        .err { background: #ffebee; color: #c62828; }
-        .info { background: #e3f2fd; color: #1565c0; }
-        .debug { 
-            background: #fff3e0; 
-            color: #e65100; 
-            font-family: monospace; 
-            font-size: 12px;
-            white-space: pre-wrap;
-        }
-        .hint { 
-            font-size: 13px; 
-            color: #818c99; 
-            margin-top: 8px;
-        }
-        .scope-list {
-            margin: 10px 0;
-        }
-        .scope-item {
-            display: flex;
-            align-items: center;
-            padding: 8px;
-            background: #f0f2f5;
-            border-radius: 6px;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        .scope-item input {
-            margin-right: 10px;
-        }
-        .input-group {
-            margin-bottom: 12px;
-        }
-        .input-group label {
-            display: block;
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 4px;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #d3d9de;
-            border-radius: 6px;
-            font-size: 14px;
-            font-family: monospace;
-        }
-    </style>
-</head>
-<body>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-<div class="box">
-    <h2>🔑 Получение токена VK</h2>
-    <div id="status" class="status hidden"></div>
-    <div id="debug" class="status debug hidden"></div>
-    
-    <div class="scope-list">
-        <div class="scope-item">
-            <input type="checkbox" id="scopeWall" checked>
-            <label for="scopeWall">wall — постинг на стену</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopeFriends" checked>
-            <label for="scopeFriends">friends — друзья</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopePhotos" checked>
-            <label for="scopePhotos">photos — фотографии</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopeGroups" checked>
-            <label for="scopeGroups">groups — группы</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopeVideo" checked>
-            <label for="scopeVideo">video — видео</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopeDocs" checked>
-            <label for="scopeDocs">docs — документы</label>
-        </div>
-        <div class="scope-item">
-            <input type="checkbox" id="scopeStatus" checked>
-            <label for="scopeStatus">status — статус</label>
-        </div>
-    </div>
-    
-    <button id="btn" class="btn-blue" onclick="getToken()">Получить токен</button>
-    
-    <div id="result" class="hidden">
-        <p><b>Ваш токен:</b></p>
-        <div class="token" id="token"></div>
-        <button class="btn-green" onclick="copyToken()">📋 Скопировать</button>
-    </div>
-    
-    <p class="hint" id="hint">Выберите права и нажмите кнопку</p>
-</div>
-
-<div class="box" id="gistBox">
-    <h3>🔐 Автоматическая выдача в Gist</h3>
-    <div class="input-group">
-        <label>GitHub Token (с правом gist):</label>
-        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
-    </div>
-    <div class="input-group">
-        <label>Gist ID (оставь пустым для создания нового):</label>
-        <input type="text" id="gistId" placeholder="a1b2c3d4e5f6...">
-    </div>
-    <button class="btn-purple" onclick="saveToGist()">💾 Сохранить токен в Gist</button>
-    <p class="hint" id="gistHint">Токен будет доступен для Python-скрипта</p>
-</div>
-
-<div class="box" id="pythonBox" style="display:none;">
-    <h3>📖 Python-скрипт для Termux</h3>
-    <div class="token" id="pythonCode"></div>
-</div>
-
-<div class="box" id="infoBox">
-    <h3>📊 Диагностика</h3>
-    <div id="diagnostic"></div>
-</div>
-
-<script>
-const APP_ID = 54634841;
-
-function log(msg) {
-    console.log('[VK Token]', msg);
-    const debug = document.getElementById('debug');
-    debug.textContent += msg + '\n';
-    debug.classList.remove('hidden');
-}
-
-function showStatus(text, type) {
-    const el = document.getElementById('status');
-    el.textContent = text;
-    el.className = 'status ' + type;
-    el.classList.remove('hidden');
-}
-
-function showHint(text) {
-    document.getElementById('hint').textContent = text;
-}
-
-const isVK = window.location.href.includes('vk.com') || 
-             window.location.href.includes('vk-apps.com') ||
-             document.referrer.includes('vk.com');
-
-const isWebView = /(iPhone|iPod|iPad).*AppleWebKit.*(iPhone|iPod|iPad)/i.test(navigator.userAgent) ||
-                  /Android.*Version\/[0-9.]*.*Chrome\/[0-9.]* Mobile/i.test(navigator.userAgent);
-
-document.getElementById('diagnostic').innerHTML = `
-    <div class="token" style="font-size:11px;">
-App ID: ${APP_ID}<br>
-vkBridge: ${typeof vkBridge !== 'undefined' ? '✅' : '❌'}<<br>
-URL: ${window.location.href}<br>
-Referrer: ${document.referrer || 'нет'}<<br>
-VK окружение: ${isVK ? '✅' : '❌'}<<br>
-WebView: ${isWebView ? '✅' : '❌'}
-    </div>
-`;
-
-let token = null;
-let bridge = null;
-
-try {
-    if (typeof vkBridge !== 'undefined') {
-        bridge = vkBridge.default || vkBridge;
-        log('Bridge получен');
-    }
-} catch (e) {
-    log('Ошибка bridge: ' + e.message);
-}
-
-function getSelectedScope() {
-    const scopes = [];
-    if (document.getElementById('scopeWall').checked) scopes.push('wall');
-    if (document.getElementById('scopeFriends').checked) scopes.push('friends');
-    if (document.getElementById('scopePhotos').checked) scopes.push('photos');
-    if (document.getElementById('scopeGroups').checked) scopes.push('groups');
-    if (document.getElementById('scopeVideo').checked) scopes.push('video');
-    if (document.getElementById('scopeDocs').checked) scopes.push('docs');
-    if (document.getElementById('scopeStatus').checked) scopes.push('status');
-    return scopes.join(',');
-}
-
-async function init() {
-    if (!bridge) {
-        showStatus('❌ VK Bridge не найден. Откройте через VK.', 'err');
-        return;
-    }
-    
-    try {
-        log('Инициализация...');
-        await bridge.send('VKWebAppInit');
-        log('Инициализировано');
-        showStatus('✅ Готово к работе', 'ok');
-    } catch (e) {
-        log('Ошибка инициализации: ' + (e.error_data?.error_reason || e.message));
-    }
-}
-
-async function getToken() {
-    const btn = document.getElementById('btn');
-    
-    if (!bridge) {
-        showStatus('❌ Откройте через VK', 'err');
-        return;
-    }
-    
-    const scope = getSelectedScope();
-    if (!scope) {
-        showStatus('❌ Выберите хотя бы одно право', 'err');
-        return;
-    }
-    
-    try {
-        btn.disabled = true;
-        btn.textContent = 'Загрузка...';
-        showStatus('Запрашиваем токен...', 'info');
-        log('App ID: ' + APP_ID);
-        log('Scope: ' + scope);
-        
-        const result = await bridge.send('VKWebAppGetAuthToken', {
-            app_id: APP_ID,
-            scope: scope
-        });
-        
-        log('Ответ: ' + JSON.stringify(result).substring(0, 200));
-        
-        if (result && result.access_token) {
-            token = result.access_token;
-            document.getElementById('token').textContent = token;
-            document.getElementById('result').classList.remove('hidden');
-            showStatus('✅ Токен получен!', 'ok');
-            showHint('Скопируйте токен или сохраните в Gist');
-            btn.textContent = '🔄 Обновить';
-        } else {
-            throw new Error('Токен отсутствует');
-        }
-        
-    } catch (e) {
-        console.error(e);
-        log('ОШИБКА: ' + JSON.stringify(e, null, 2));
-        
-        let errorMsg = 'Не удалось получить токен';
-        if (e.error_data) {
-            errorMsg = e.error_data.error_reason || e.error_data.error_code;
-        } else if (e.message) {
-            errorMsg = e.message;
-        }
-        
-        showStatus('❌ ' + errorMsg, 'err');
-        btn.textContent = 'Повторить';
-    } finally {
-        btn.disabled = false;
-    }
-}
-
-async function copyToken() {
-    if (!token) return;
-    try {
-        await bridge.send('VKWebAppCopyText', { text: token });
-        showStatus('✅ Скопировано!', 'ok');
-    } catch (e) {
-        const el = document.createElement('textarea');
-        el.value = token;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-        showStatus('✅ Скопировано!', 'ok');
-    }
-}
-
-async function saveToGist() {
-    const githubToken = document.getElementById('githubToken').value.trim();
-    const gistId = document.getElementById('gistId').value.trim();
-    
-    if (!githubToken) {
-        showStatus('❌ Введите GitHub Token', 'err');
-        document.getElementById('githubToken').focus();
-        return;
-    }
-    
-    if (!token) {
-        showStatus('❌ Сначала получите VK токен', 'err');
-        return;
-    }
-    
-    const filename = 'vk_token.json';
-    const content = JSON.stringify({
-        access_token: token,
-        scope: getSelectedScope(),
-        created_at: new Date().toISOString(),
-        app_id: APP_ID
-    }, null, 2);
-    
-    try {
-        showStatus('Сохраняем в Gist...', 'info');
-        
-        let response;
-        let isNew = false;
-        
-        if (gistId) {
-            response = await fetch(`https://api.github.com/gists/${gistId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/vnd.github.v3+json'
-                },
-                body: JSON.stringify({
-                    files: {
-                        [filename]: {
-                            content: content
-                        }
-                    }
-                })
-            });
-        } else {
-            isNew = true;
-            response = await fetch('https://api.github.com/gists', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/vnd.github.v3+json'
-                },
-                body: JSON.stringify({
-                    description: 'VK Token for Termux Bot',
-                    public: false,
-                    files: {
-                        [filename]: {
-                            content: content
-                        }
-                    }
-                })
-            });
-        }
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.message || `HTTP ${response.status}`);
-        }
-        
-        const newGistId = result.id;
-        const rawUrl = result.files[filename].raw_url;
-        
-        if (isNew) {
-            document.getElementById('gistId').value = newGistId;
-        }
-        
-        showStatus(`✅ Сохранено в Gist! ID: ${newGistId}`, 'ok');
-        
-        // Генерируем Python-код
-        const pythonCode = `import requests
+import requests
 import json
 import os
+import sys
+import time
 
-GIST_ID = "${newGistId}"
-GITHUB_TOKEN = "${githubToken}"
+# ========== КОНФИГУРАЦИЯ ==========
+# Заполни после первого запуска Mini App в авто-режиме
+GIST_ID = ""           # Вставь сюда Gist ID
+GITHUB_TOKEN = ""      # Вставь сюда GitHub Token
+
+# Файлы
 CONFIG_FILE = os.path.expanduser("~/.vk_bot_config.json")
+TOKEN_FILE = os.path.expanduser("~/.vk_token")
+GIST_CONFIG = os.path.expanduser("~/.vk_gist_config")
 
-def get_token():
-    token = load_local()
-    if token:
-        return token
+# ========== ЗАГРУЗКА КОНФИГА ==========
+
+def load_gist_config():
+    """Загружает Gist ID и GitHub Token из файла"""
+    global GIST_ID, GITHUB_TOKEN
+    
+    if os.path.exists(GIST_CONFIG):
+        try:
+            with open(GIST_CONFIG, 'r') as f:
+                data = json.load(f)
+                GIST_ID = data.get('gist_id', GIST_ID)
+                GITHUB_TOKEN = data.get('github_token', GITHUB_TOKEN)
+        except:
+            pass
+
+def save_gist_config():
+    """Сохраняет Gist конфиг"""
+    try:
+        with open(GIST_CONFIG, 'w') as f:
+            json.dump({
+                'gist_id': GIST_ID,
+                'github_token': GITHUB_TOKEN
+            }, f)
+        os.chmod(GIST_CONFIG, 0o600)
+    except Exception as e:
+        print(f"[-] Ошибка сохранения конфига: {e}")
+
+# Загружаем конфиг при старте
+load_gist_config()
+
+# ========== ПОЛУЧЕНИЕ ТОКЕНА ==========
+
+def get_token_from_gist():
+    """Забирает токен из GitHub Gist"""
+    if not GIST_ID or not GITHUB_TOKEN:
+        return None
     
     try:
-        resp = requests.get(
+        response = requests.get(
             f"https://api.github.com/gists/{GIST_ID}",
-            headers={"Authorization": f"token {GITHUB_TOKEN}"}
+            headers={
+                "Authorization": f"token {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github.v3+json"
+            },
+            timeout=10
         )
-        data = resp.json()
-        content = data['files']['vk_token.json']['content']
-        token_data = json.loads(content)
-        token = token_data['access_token']
-        save_local(token)
-        return token
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        for filename, fileinfo in data.get('files', {}).items():
+            if filename == 'vk_token.json':
+                token_data = json.loads(fileinfo['content'])
+                token = token_data.get('access_token')
+                
+                # Проверяем, не протух ли
+                if token:
+                    return token
+        
+        return None
+        
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"[-] Ошибка Gist: {e}")
         return None
 
-def load_local():
+
+def get_token_from_file():
+    """Загружает токен из локального файла"""
     try:
-        with open(CONFIG_FILE) as f:
-            return json.load(f).get('token')
-    except:
-        return None
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                data = json.load(f)
+                return data.get('token')
+        
+        if os.path.exists(TOKEN_FILE):
+            with open(TOKEN_FILE, 'r') as f:
+                return f.read().strip()
+                
+    except Exception as e:
+        print(f"[-] Ошибка чтения файла: {e}")
+    
+    return None
 
-def save_local(token):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump({'token': token}, f)
+
+def save_token_local(token):
+    """Сохраняет токен локально"""
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump({'token': token}, f)
+        os.chmod(CONFIG_FILE, 0o600)
+        return True
+    except Exception as e:
+        print(f"[-] Ошибка сохранения: {e}")
+        return False
+
+
+def get_token(force_refresh=False):
+    """
+    Получает токен автоматически:
+    1. Локальный кэш
+    2. GitHub Gist (если настроен)
+    3. None (нужно запустить Mini App)
+    """
+    if not force_refresh:
+        # Пробуем локальный
+        token = get_token_from_file()
+        if token:
+            return token
+    
+    # Пробуем Gist
+    if GIST_ID and GITHUB_TOKEN:
+        token = get_token_from_gist()
+        if token:
+            save_token_local(token)
+            return token
+    
+    return None
+
+
+# ========== VK API ==========
 
 def vk_api(method, **params):
+    """Универсальный вызов VK API с авто-обновлением токена"""
     token = get_token()
+    
     if not token:
-        raise Exception("Токен не найден")
-    params.update({'access_token': token, 'v': '5.199'})
-    resp = requests.post(f'https://api.vk.com/method/{method}', data=params)
-    result = resp.json()
-    if 'error' in result and result['error']['error_code'] == 5:
-        os.remove(CONFIG_FILE)
-        return vk_api(method, **params)
-    return result
+        raise Exception(
+            "❌ Токен не найден!\n"
+            "1. Открой Mini App в VK\n"
+            "2. Введи GitHub Token\n"
+            "3. Нажми 'Запустить авто-режим'\n"
+            "4. Скопируй Gist ID в этот скрипт"
+        )
+    
+    params.update({
+        'access_token': token,
+        'v': '5.199'
+    })
+    
+    try:
+        response = requests.post(
+            f'https://api.vk.com/method/{method}',
+            data=params,
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+        
+        # Проверяем ошибку токена
+        if 'error' in result:
+            error_code = result['error'].get('error_code')
+            
+            if error_code == 5:  # Authorization failed
+                print("[-] Токен протух, обновляем из Gist...")
+                # Чистим кэш и пробуем снова
+                for f in [CONFIG_FILE, TOKEN_FILE]:
+                    if os.path.exists(f):
+                        os.remove(f)
+                
+                # Пробуем забрать свежий из Gist
+                token = get_token(force_refresh=True)
+                if token:
+                    return vk_api(method, **params)
+                else:
+                    raise Exception("Токен недействителен. Запусти Mini App снова.")
+            
+            raise Exception(
+                f"VK API Error {error_code}: {result['error'].get('error_msg')}"
+            )
+        
+        return result
+        
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Сетевая ошибка: {e}")
 
-# Использование:
-# result = vk_api('wall.post', message='Привет из Termux!')
-# print(result)`;
-        
-        document.getElementById('pythonCode').innerHTML = pythonCode.replace(/\n/g, '<br>');
-        document.getElementById('pythonBox').style.display = 'block';
-        
-        document.getElementById('gistHint').innerHTML = `
-            <b>Gist ID:</b> ${newGistId}<br>
-            <b>Скопируй Python-код ниже в свой скрипт</b>
-        `;
-        
-    } catch (e) {
-        showStatus('❌ Ошибка Gist: ' + e.message, 'err');
-        log('Ошибка Gist: ' + e.message);
+
+# ========== УДОБНЫЕ МЕТОДЫ ==========
+
+def post_to_wall(message, attachments=None, owner_id=None):
+    """Пост на стену"""
+    params = {'message': message}
+    if attachments:
+        params['attachments'] = attachments
+    if owner_id:
+        params['owner_id'] = owner_id
+    return vk_api('wall.post', **params)
+
+
+def get_user_info(user_ids=None):
+    """Информация о пользователе"""
+    params = {}
+    if user_ids:
+        params['user_ids'] = user_ids
+    return vk_api('users.get', **params)
+
+
+def get_friends(count=100):
+    """Список друзей"""
+    return vk_api('friends.get', count=count, fields='first_name,last_name')
+
+
+def send_message(peer_id, message, attachment=None):
+    """Отправка сообщения"""
+    params = {
+        'peer_id': peer_id,
+        'message': message,
+        'random_id': int(time.time() * 1000)
     }
-}
+    if attachment:
+        params['attachment'] = attachment
+    return vk_api('messages.send', **params)
 
-document.addEventListener('DOMContentLoaded', init);
-</script>
 
-</body>
-</html>
+# ========== АВТО-НАСТРОЙКА ==========
+
+def setup_from_gist(gist_id, github_token):
+    """Настройка Gist ID и GitHub Token"""
+    global GIST_ID, GITHUB_TOKEN
+    
+    GIST_ID = gist_id
+    GITHUB_TOKEN = github_token
+    save_gist_config()
+    
+    # Сразу пробуем получить токен
+    token = get_token_from_gist()
+    if token:
+        save_token_local(token)
+        print(f"[+] Токен получен: {token[:20]}...")
+        return True
+    return False
+
+
+# ========== ТЕСТИРОВАНИЕ ==========
+
+if __name__ == "__main__":
+    print("=" * 50)
+    print("🤖 VK Bot Auto для Termux")
+    print("=" * 50)
+    
+    # Проверяем конфиг
+    if not GIST_ID or not GITHUB_TOKEN:
+        print("\n[-] Не настроен Gist!")
+        print("[i] Варианты:")
+        print("   1. Запусти Mini App в VK и используй авто-режим")
+        print("   2. Или введи вручную:")
+        
+        gist_id = input("   Gist ID: ").strip()
+        token = input("   GitHub Token: ").strip()
+        
+        if setup_from_gist(gist_id, token):
+            print("[+] Настройка завершена!")
+        else:
+            print("[-] Не удалось получить токен")
+            sys.exit(1)
+    
+    # Проверяем токен
+    print("\n[+] Проверяем токен...")
+    try:
+        user = get_user_info()
+        name = user['response'][0]
+        print(f"[+] Привет, {name['first_name']} {name['last_name']}! ✅")
+        
+        # Тест: пост на стену (раскомментируй)
+        # result = post_to_wall("🤖 Автопост из Termux!")
+        # print(f"[+] Пост создан: {result}")
+        
+    except Exception as e:
+        print(f"[-] Ошибка: {e}")
+        sys.exit(1)
