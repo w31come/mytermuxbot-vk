@@ -1,3 +1,5 @@
+# core/token_manager.py
+
 import os
 import json
 import requests
@@ -10,7 +12,6 @@ def log(msg):
 
 
 def get_token_from_gist():
-    """Забирает токен из GitHub Gist"""
     gist_id = os.environ.get('GIST_ID')
     github_token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
     
@@ -47,14 +48,34 @@ def get_token_from_gist():
 
 
 def validate_token(token):
-    """Проверяет валидность токена"""
+    """Проверяем токен через простой запрос — не через users.get"""
     try:
+        # Пробуем wall.get с count=1 — минимальный запрос
         resp = requests.get(
-            'https://api.vk.com/method/users.get',
-            params={'access_token': token, 'v': '5.199'},
+            'https://api.vk.com/method/wall.get',
+            params={
+                'access_token': token,
+                'v': '5.199',
+                'owner_id': 1,  # Паблик Дурова
+                'count': 1
+            },
             timeout=10
         )
         data = resp.json()
-        return 'error' not in data
-    except:
+        
+        # Если нет ошибки 5 — токен валиден
+        if 'error' in data:
+            code = data['error'].get('error_code')
+            if code == 5:
+                log('[-] Токен протух (error 5)')
+                return False
+            # Другие ошибки (например 15 — нет доступа к стене) — нормально
+            log(f'[i] Токен живой, но ошибка {code}: {data["error"].get("error_msg", "")[:50]}')
+            return True
+        
+        log('[+] Токен валиден')
+        return True
+        
+    except Exception as e:
+        log(f'[-] Ошибка проверки токена: {e}')
         return False
