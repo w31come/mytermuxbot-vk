@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VK Token</title>
+    <title>VK Token Auto</title>
     <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; padding: 16px; background: #f5f5f5; }
         .box { background: white; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
         button { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
         .btn-blue { background: #0077ff; color: white; }
-        .btn-purple { background: #7356bf; color: white; margin-top: 10px; }
+        .btn-blue:disabled { background: #99caff; }
         .token { background: #f0f2f5; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; word-break: break-all; margin: 10px 0; }
         .hidden { display: none; }
         .status { padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
@@ -27,137 +28,119 @@
     <h2>🔑 VK Token Auto</h2>
     <div id="status" class="status hidden"></div>
     
-    <label>GitHub Token:</label>
+    <label>GitHub Token (ghp_...):</label>
     <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
     
-    <label>Gist ID (оставь пустым):</label>
-    <input type="text" id="gistId" placeholder="необязательно">
+    <label>Gist ID (если есть):</label>
+    <input type="text" id="gistId" placeholder="оставь пустым для создания">
     
-    <button class="btn-blue" onclick="autoGetToken()">🚀 Получить и сохранить</button>
+    <button class="btn-blue" id="btn" onclick="autoToken()">🚀 Получить и сохранить</button>
     
     <div id="result" class="hidden">
         <p><b>Токен:</b></p>
         <div class="token" id="token"></div>
     </div>
     
-    <p style="font-size: 13px; color: #818c99; margin-top: 10px;" id="hint">Нажми кнопку для автоматического получения</p>
+    <p style="font-size: 13px; color: #818c99; margin-top: 10px;" id="hint">Нажми кнопку — всё автоматически</p>
 </div>
 
 <script>
 const APP_ID = 54634841;
 let bridge = null;
-let vkToken = null;
 
-function showStatus(text, type) {
+function show(text, type) {
     const el = document.getElementById('status');
     el.textContent = text;
     el.className = 'status ' + type;
     el.classList.remove('hidden');
 }
 
-// Инициализация
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async () => {
     try {
         bridge = vkBridge.default || vkBridge;
         await bridge.send('VKWebAppInit');
-        showStatus('✅ Готово', 'ok');
+        show('✅ Готово', 'ok');
     } catch (e) {
-        showStatus('❌ Ошибка инициализации: ' + e.message, 'err');
+        show('❌ Ошибка: ' + e.message, 'err');
     }
 });
 
-async function autoGetToken() {
-    const btn = document.querySelector('button');
+async function autoToken() {
+    const btn = document.getElementById('btn');
     btn.disabled = true;
     btn.textContent = 'Загрузка...';
     
     try {
         // 1. Получаем VK токен
-        showStatus('Получаем VK токен...', 'info');
-        const vkResult = await bridge.send('VKWebAppGetAuthToken', {
+        show('Получаем VK токен...', 'info');
+        const vk = await bridge.send('VKWebAppGetAuthToken', {
             app_id: APP_ID,
             scope: 'wall,friends,photos,groups,video,docs,status'
         });
         
-        if (!vkResult.access_token) {
-            throw new Error('Токен не получен');
-        }
+        if (!vk.access_token) throw new Error('Токен не получен');
         
-        vkToken = vkResult.access_token;
-        document.getElementById('token').textContent = vkToken;
+        document.getElementById('token').textContent = vk.access_token;
         document.getElementById('result').classList.remove('hidden');
         
         // 2. Сохраняем в Gist
-        const githubToken = document.getElementById('githubToken').value.trim();
-        const gistId = document.getElementById('gistId').value.trim();
+        const gh = document.getElementById('githubToken').value.trim();
+        const gid = document.getElementById('gistId').value.trim();
         
-        if (githubToken) {
-            showStatus('Сохраняем в Gist...', 'info');
-            await saveToGist(githubToken, gistId, vkToken);
-            showStatus('✅ Готово! Токен сохранён в Gist', 'ok');
-        } else {
-            showStatus('✅ Токен получен! Введи GitHub Token для автосохранения', 'ok');
+        if (!gh) {
+            show('✅ Токен получен! Введи GitHub Token для сохранения', 'ok');
+            btn.disabled = false;
+            btn.textContent = '🚀 Получить и сохранить';
+            return;
         }
+        
+        show('Сохраняем в Gist...', 'info');
+        
+        const content = JSON.stringify({
+            access_token: vk.access_token,
+            created_at: new Date().toISOString(),
+            app_id: APP_ID
+        }, null, 2);
+        
+        let resp;
+        if (gid) {
+            resp = await fetch(`https://api.github.com/gists/${gid}`, {
+                method: 'PATCH',
+                headers: {'Authorization': `token ${gh}`, 'Content-Type': 'application/json'},
+                body: JSON.stringify({files: {'vk_token.json': {content}}})
+            });
+        } else {
+            resp = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {'Authorization': `token ${gh}`, 'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    description: 'VK Token Auto',
+                    public: false,
+                    files: {'vk_token.json': {content}}
+                })
+            });
+        }
+        
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.message);
+        
+        if (!gid) {
+            document.getElementById('gistId').value = data.id;
+        }
+        
+        show(`✅ Готово! Gist ID: ${data.id}`, 'ok');
+        document.getElementById('hint').innerHTML = 
+            `<b>Скопируй в скрипт:</b><br>` +
+            `GIST_ID = "${data.id}"<br>` +
+            `GITHUB_TOKEN = "${gh.substring(0, 10)}..."`;
         
     } catch (e) {
         console.error(e);
-        showStatus('❌ ' + (e.error_data?.error_reason || e.message), 'err');
+        show('❌ ' + (e.error_data?.error_reason || e.message), 'err');
     } finally {
         btn.disabled = false;
         btn.textContent = '🚀 Получить и сохранить';
     }
-}
-
-async function saveToGist(githubToken, gistId, token) {
-    const content = JSON.stringify({
-        access_token: token,
-        created_at: new Date().toISOString(),
-        app_id: APP_ID
-    }, null, 2);
-    
-    let response;
-    
-    if (gistId) {
-        response = await fetch(`https://api.github.com/gists/${gistId}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `token ${githubToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                files: {
-                    'vk_token.json': { content: content }
-                }
-            })
-        });
-    } else {
-        response = await fetch('https://api.github.com/gists', {
-            method: 'POST',
-            headers: {
-                'Authorization': `token ${githubToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                description: 'VK Token',
-                public: false,
-                files: {
-                    'vk_token.json': { content: content }
-                }
-            })
-        });
-    }
-    
-    const result = await response.json();
-    
-    if (!response.ok) {
-        throw new Error(result.message);
-    }
-    
-    if (!gistId) {
-        document.getElementById('gistId').value = result.id;
-    }
-    
-    return result.id;
 }
 </script>
 
