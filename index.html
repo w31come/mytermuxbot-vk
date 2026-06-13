@@ -108,8 +108,16 @@
             <label for="scopeGroups">groups — группы</label>
         </div>
         <div class="scope-item">
-            <input type="checkbox" id="scopeOffline" checked>
-            <label for="scopeOffline">offline — бессрочный токен</label>
+            <input type="checkbox" id="scopeVideo" checked>
+            <label for="scopeVideo">video — видео</label>
+        </div>
+        <div class="scope-item">
+            <input type="checkbox" id="scopeDocs" checked>
+            <label for="scopeDocs">docs — документы</label>
+        </div>
+        <div class="scope-item">
+            <input type="checkbox" id="scopeStatus" checked>
+            <label for="scopeStatus">status — статус</label>
         </div>
     </div>
     
@@ -141,8 +149,7 @@ print(r.json())
 </div>
 
 <script>
-// === КОНФИГУРАЦИЯ ===
-const APP_ID = 54634841; // Твой реальный App ID
+const APP_ID = 54634841;
 
 function log(msg) {
     console.log('[VK Token]', msg);
@@ -198,7 +205,9 @@ function getSelectedScope() {
     if (document.getElementById('scopeFriends').checked) scopes.push('friends');
     if (document.getElementById('scopePhotos').checked) scopes.push('photos');
     if (document.getElementById('scopeGroups').checked) scopes.push('groups');
-    if (document.getElementById('scopeOffline').checked) scopes.push('offline');
+    if (document.getElementById('scopeVideo').checked) scopes.push('video');
+    if (document.getElementById('scopeDocs').checked) scopes.push('docs');
+    if (document.getElementById('scopeStatus').checked) scopes.push('status');
     return scopes.join(',');
 }
 
